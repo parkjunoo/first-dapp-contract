@@ -1,3 +1,4 @@
+const { assert } = require("chai");
 const assertRevert = require("./assertRevert");
 const Lottery = artifacts.require("Lottery");
 const expectEvent = require("./expectEvent");
@@ -44,6 +45,15 @@ contract("Lottery", function ([deployer, user1, user2]) {
       assert.equal(bet.challengers, "0xab");
       //log
       await expectEvent.inLogs(recept.logs, "BET");
+    });
+  });
+
+  describe("isMatch", function () {
+    it("need faile when the bet moneyy is 0.005 eth", async () => {
+      let blockHash =
+        "0x61740bacb40467ccc86a6052caa35cb21eb923dd30ab31dc177a42ce6591c6ee";
+      let matchingResult = await lottery.isMatch("0xab", blockHash);
+      assert.equal(matchingResult, 0);
     });
   });
 });

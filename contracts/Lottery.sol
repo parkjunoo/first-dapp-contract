@@ -10,18 +10,25 @@ contract Lottery {
     uint256 private _tail;
     uint256 private _head;
     mapping (uint256 => BetInfo) private _bets;
+    
+    bool private mode = false;
 
-    address public owner;
+    address payable public owner;
     uint256 constant internal BLOCK_LIMIT = 256;
     uint256 constant internal BET_BLOCK_INTERVAL = 3;
     uint256 constant internal BET_AMOUNT = 5 * 10 ** 15;
 
     uint256 private _pot;
+    
+    bytes32 public answerForTest ;
+
+    enum BlockStatus {checkable, notRevealed, BlockLimitPassed}
+    enum BettingResult {Fail, Win, Draw}
     event BET(uint256 index, address bettor, uint256 amount, bytes1 challenger, uint256 answerBlockNumber);
 
     constructor() {
         //배포가 될때 보낸사람을 owner로 저장한다.
-        owner = msg.sender;
+        owner = payable(msg.sender);
     } 
 
     function getSomeValue() public pure returns (uint256 value) {
@@ -47,6 +54,105 @@ contract Lottery {
         // emit event;
         emit BET(_tail - 1, msg.sender, msg.value, challengers, block.number + BET_BLOCK_INTERVAL);
         return true;
+    }
+
+    function distribute() public {
+        uint256 cur;
+        BetInfo memory b;
+        BlockStatus currentBlockStatus;
+        BettingResult currentBettingResult;
+        for(cur= _head; cur < _tail; cur++) {
+           b = _bets[cur];
+           currentBlockStatus = getBlockStatus(b.answerBlockNumber);
+
+           if(currentBlockStatus == BlockStatus.checkable){
+               currentBettingResult = isMatch(b.challengers, blockhash(b.answerBlockNumber));
+               if(currentBettingResult == BettingResult.Win){
+
+               }
+               if(currentBettingResult == BettingResult.Fail) {
+
+               }
+               if(currentBettingResult == BettingResult.Draw) {
+
+               }
+           }
+           if(currentBlockStatus == BlockStatus.notRevealed){
+
+               break;
+           }
+           if(currentBlockStatus == BlockStatus.BlockLimitPassed){
+               // 환불
+           }
+           popBet(cur);
+        }
+    }
+
+    function transferAfterPayingFee(address payable addr, uint256 amount) internal returns (uint256) {
+        // uint256 fee = amount / 100;
+        uint256 fee = 0;
+        uint256 amountWithOutFee = amount - fee;
+
+        addr.transfer(amountWithOutFee);
+        owner.transfer(fee);
+        // call, send, transfer transfer() -> 가장안전한 방법
+        // send -> 돈을 보내면 false 을 리턴함
+        // call -> 단순히 돈만 보내는것이 아니라 특정 트랜잭션을 실행할 수 있음 왠만하면 call을쓰지 말자...
+
+    }
+
+    function setAnswerForTest(bytes32 answer) public returns (bool result){
+        require(msg.sender == owner, "Only owner can set");
+        answerForTest = answer;
+        return true;
+    }
+
+    function getAnswerBlockHash(uint256 answerBlockNumber) internal view returns (bytes32 answer){
+        return mode ? blockhash(answerBlockNumber): answerForTest;
+    }
+
+    /**
+        @dev 배팅 글자와 정답 확인
+        @param challengers 배팅글자
+        @param answer 블락해쉬
+        @return 정답결과
+     */
+    function isMatch(bytes1 challengers, bytes32 answer) public pure returns (BettingResult) {
+        bytes1 first1 = challengers;
+        bytes1 first2 = challengers;
+
+        bytes1 answer1 = answer[0];
+        bytes1 answer2 = answer[0];
+        
+        first1 = first1 >> 4;
+        first1 = first1 << 4;
+
+        answer1 = answer1 >> 4;
+        answer1 = answer1 << 4;
+
+        first2 = first2 << 4;
+        first2 = first2 >> 4;
+
+        answer2 = answer2 << 4;
+        answer2 = answer2 >> 4;
+
+        if(first1 == answer1 && first2 == answer2){
+            return BettingResult.Win;
+        }
+        if(first1 == answer1 || first2 == answer2) {
+            return BettingResult.Draw;
+        }
+        return BettingResult.Fail;
+    }
+
+    function getBlockStatus(uint256 answerBlockNumber) internal view returns (BlockStatus) {
+        if(block.number > answerBlockNumber && block.number < BLOCK_LIMIT + answerBlockNumber){
+            return BlockStatus.checkable;
+        }
+        if( block.number <= answerBlockNumber ){
+            return BlockStatus.notRevealed;
+        }
+        return BlockStatus.BlockLimitPassed;
     }
 
 
