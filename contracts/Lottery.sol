@@ -41,7 +41,7 @@ contract Lottery {
 
     function bet(bytes1 challengers) public payable returns (bool result) {
         // check the proper ether is snet;
-        require(msg.value == BET_AMOUNT, "not enough Eth!");
+        require(msg.value == BET_AMOUNT, "not enough revert Eth!");
         require(pushBet(challengers), 'Fail to Add a new Bet Info');
         // push bet to the queue;
         // emit event;
