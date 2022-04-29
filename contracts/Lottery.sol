@@ -24,7 +24,12 @@ contract Lottery {
 
     enum BlockStatus {checkable, notRevealed, BlockLimitPassed}
     enum BettingResult {Fail, Win, Draw}
+
     event BET(uint256 index, address bettor, uint256 amount, bytes1 challenger, uint256 answerBlockNumber);
+    event WIN(uint256 index, address bettor, uint256 amount, bytes1 challenger, bytes1 answer, uint256 answerBlockNumber);
+    event FAIL(uint256 index, address bettor, uint256 amount, bytes1 challenger, bytes1 answer, uint256 answerBlockNumber);
+    event DRAW(uint256 index, address bettor, uint256 amount, bytes1 challenger, bytes1 answer, uint256 answerBlockNumber);
+    event REFUND(uint256 index, address bettor, uint256 amount, bytes1 challenger, uint256 answerBlockNumber);
 
     constructor() {
         //배포가 될때 보낸사람을 owner로 저장한다.
@@ -39,6 +44,13 @@ contract Lottery {
         return _pot;
     }
 
+    function betAndDistribute(bytes1 challengers) public payable returns (bool result) {
+        bet(challengers);
+        distribute();
+
+        return true;
+    }
+
 
     /**
      * @dev
@@ -47,34 +59,42 @@ contract Lottery {
      */
 
     function bet(bytes1 challengers) public payable returns (bool result) {
-        // check the proper ether is snet;
-        require(msg.value == BET_AMOUNT, "not enough revert Eth!");
+        require(msg.value == BET_AMOUNT, "not enough Eth!");
         require(pushBet(challengers), 'Fail to Add a new Bet Info');
-        // push bet to the queue;
-        // emit event;
         emit BET(_tail - 1, msg.sender, msg.value, challengers, block.number + BET_BLOCK_INTERVAL);
         return true;
     }
 
     function distribute() public {
         uint256 cur;
+        uint256 transferAmount;
+
         BetInfo memory b;
         BlockStatus currentBlockStatus;
         BettingResult currentBettingResult;
+
         for(cur= _head; cur < _tail; cur++) {
            b = _bets[cur];
            currentBlockStatus = getBlockStatus(b.answerBlockNumber);
 
            if(currentBlockStatus == BlockStatus.checkable){
-               currentBettingResult = isMatch(b.challengers, blockhash(b.answerBlockNumber));
-               if(currentBettingResult == BettingResult.Win){
+               bytes32 answerBlockHash = getAnswerBlockHash(b.answerBlockNumber);
+               currentBettingResult = isMatch(b.challengers, answerBlockHash);
 
+               if(currentBettingResult == BettingResult.Win){
+                   transferAmount = transferAfterPayingFee(b.bettor, _pot + BET_AMOUNT);
+                   _pot = 0;
+
+                   emit WIN(cur, b.bettor, transferAmount, b.challengers, answerBlockHash[0], b.answerBlockNumber);
                }
                if(currentBettingResult == BettingResult.Fail) {
-
+                   _pot += BET_AMOUNT;
+                   
+                   emit FAIL(cur, b.bettor, 0, b.challengers, answerBlockHash[0], b.answerBlockNumber);
                }
                if(currentBettingResult == BettingResult.Draw) {
-
+                   transferAmount = transferAfterPayingFee(b.bettor, BET_AMOUNT);
+                   emit DRAW(cur, b.bettor, transferAmount, b.challengers, answerBlockHash[0], b.answerBlockNumber);
                }
            }
            if(currentBlockStatus == BlockStatus.notRevealed){
@@ -82,10 +102,13 @@ contract Lottery {
                break;
            }
            if(currentBlockStatus == BlockStatus.BlockLimitPassed){
-               // 환불
+                transferAmount = transferAfterPayingFee(b.bettor, BET_AMOUNT);
+                emit REFUND(cur, b.bettor, transferAmount, b.challengers, b.answerBlockNumber);
+               
            }
            popBet(cur);
         }
+        _head = cur;
     }
 
     function transferAfterPayingFee(address payable addr, uint256 amount) internal returns (uint256) {
