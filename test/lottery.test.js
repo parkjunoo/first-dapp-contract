@@ -46,7 +46,7 @@ contract("Lottery", function ([deployer, user1, user2]) {
       await expectEvent.inLogs(recept.logs, "BET");
     });
   });
-  
+
   describe("Distribute", function () {
     describe("when the answer is checkable", function () {
       it("전부다 맞았을 때", async () => {
@@ -82,27 +82,89 @@ contract("Lottery", function ([deployer, user1, user2]) {
         let potBefore = await lottery.getPot();
         let user1BalanceBefore = await web3.eth.getBalance(user1);
 
+        let receipt7 = await lottery.betAndDistribute("0x12", {
+          from: user2,
+          value: betAmount,
+        }); //7 -> 유저 1에게 팟머니 증정
+
         let potAfter = await lottery.getPot();
         let user1BalanceAfter = await web3.eth.getBalance(user1);
 
         assert.equal(
           potBefore.toString(),
-          new web3.utils.BN("10000000000000000").toString()
+          betAmountBet.add(betAmountBet).toString()
         );
+        assert.equal(potAfter.toString(), "0");
+
+        user1BalanceBefore = new web3.utils.BN(user1BalanceBefore);
+        assert.equal(
+          user1BalanceBefore.add(potBefore).add(betAmountBet).toString(),
+          new web3.utils.BN(user1BalanceAfter).toString()
+        );
+      });
+    });
+    describe("when the answer is not revealed", function () {
+      it("한글자만 맞았을때", async () => {
+
+        await lottery.setAnswerForTest(
+          "0x61740bacb40467ccc86a6052caa35cb21eb923dd30ab31dc177a42ce6591c6ee",
+          { from: deployer }
+        );
+        await lottery.betAndDistribute("0x12", {
+          from: user2,
+          value: betAmount,
+        }); //1
+        await lottery.betAndDistribute("0x13", {
+          from: user2,
+          value: betAmount,
+        }); //2
+        await lottery.betAndDistribute("0x61", {
+          from: user1,
+          value: betAmount,
+        }); //3
+        await lottery.betAndDistribute("0x12", {
+          from: user2,
+          value: betAmount,
+        }); //4
+        await lottery.betAndDistribute("0x12", {
+          from: user2,
+          value: betAmount,
+        }); //5
+        await lottery.betAndDistribute("0x12", {
+          from: user2,
+          value: betAmount,
+        }); //6
+
+        let potBefore = await lottery.getPot();
+        let user1BalanceBefore = await web3.eth.getBalance(user1);
 
         let receipt7 = await lottery.betAndDistribute("0x12", {
           from: user2,
           value: betAmount,
         }); //7 -> 유저 1에게 팟머니 증정
 
-        // assert.equal(potBefore, )
+        let potAfter = await lottery.getPot();
+        let user1BalanceAfter = await web3.eth.getBalance(user1);
+
+        assert.equal(
+          potBefore.toString(),
+          betAmountBet.add(betAmountBet).toString()
+        );
+        assert.equal(potAfter.toString(), "0");
+
+        user1BalanceBefore = new web3.utils.BN(user1BalanceBefore);
+        assert.equal(
+          user1BalanceBefore.add(potBefore).add(betAmountBet).toString(),
+          new web3.utils.BN(user1BalanceAfter).toString()
+        );
+
       });
     });
-    describe("when the answer is not revealed", function () {
-      it("한글자만 맞았을때", async () => {});
-    });
     describe("when the answer is not reveald limit is passed", function () {
-      it("모두다 틀렸을 때", async () => {});
+      it("모두다 틀렸을 때", async () => {
+
+        
+      });
     });
   });
 
