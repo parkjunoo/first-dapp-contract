@@ -1,5 +1,5 @@
 import logo from "./logo.svg";
-// import web3 from "web3";
+import web3 from "web3";
 import { useEffect } from "react";
 
 import "./App.css";
